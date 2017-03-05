@@ -1,5 +1,7 @@
 import commands
 
+# последний свободный элемент стека
+stack_till = 0
 # команды записаны в виде "name" ->[ номер, количество параметров]
 commands = {'ip': (1, 1), # перейти на строку с номером x
             'inp' : (2, 1), # считать число с клавиатуры записать по адресу х
@@ -16,15 +18,52 @@ commands = {'ip': (1, 1), # перейти на строку с номером x
             'out' : (13, 1), # вывести значение по адресу х на экран
             'stop' : (14, 0), # завершить исполнение
             'res' : (15, 1), # зарезервировать на стеке место для х переменных
-            'sin': (16, 1)  # синхронизировать окно и окно вначале программы
+            'sin': (16, 1),  # синхронизировать окно и окно вначале программы
+            'prin' : (17, 1) # вывести на дисплей фразу (Идеалогически фраза записывается в особый раздел,
+                            # на данный момент на конец стека, далее аргумент - адрес начала записи,
+                            # запись заканчивается нулем)
             }
 
+
+def getBinary(a, block_size):
+    ans = []
+    for i in range(block_size):
+        ans += [a % 16 ** 2]
+        a //= 16 ** 2
+    return bytearray(ans)
+
+
+def changeMemoryLine(line_number, newValue):
+    global memory
+    memory = memory[:(line_number * 5)]  + newValue + memory[((line_number + 1) * 5):]
+
+
+def processPrint(words, output):
+    global stack_till
+    global memory
+    old_stack_till = stack_till
+    for i in range(len(words)):
+        for c in words[i]:
+            changeMemoryLine(stack_till, getBinary(ord(c), 5))
+            stack_till -= 1
+        if i != len(words) - 1:
+            changeMemoryLine(stack_till, getBinary(ord(' '), 5))
+        else:
+            changeMemoryLine(stack_till, getBinary(0, 5))
+        stack_till -= 1
+    return bytearray([old_stack_till // 16 ** 2, old_stack_till % 16 ** 2 ]) + bytearray([0, 0])
+
+
 def translateLine(line, output):
+    global memory
     words = line.split()
     newBytes = []
     newBytes.append(commands[words[0]][0])
+
     if commands[words[0]][1] == 0:
         newBytes += [0, 0, 0, 0]
+    elif commands[words[0]][0] == 17:
+        newBytes += processPrint(words[1:-1], output)
     elif commands[words[0]][1] == 1:
         argument = int(words[1])
         newBytes += [argument // 16 ** 2, argument % 16 ** 2, 0, 0]
@@ -33,15 +72,19 @@ def translateLine(line, output):
         b = int(words[2])
         newBytes += [a // 16 ** 2, a % 16 ** 2, b // 16 ** 2, b % 16 ** 2]
     print(newBytes)
-    newFileByteArray = bytearray(newBytes)
-    output.write(newFileByteArray)
+    memory += bytearray(newBytes)
     if(words[0] == 'ip'):
+        global stack_till
+        stack_till = int(words[1]) - 1
         for i in range(int(words[1]) - 1):
-            output.write(bytearray([0, 0, 0, 0, 0]))
+            memory += bytearray([0, 0, 0, 0, 0])
 
 if __name__ == '__main__':
     file = open("fib.txt")
     lines = file.readlines()
     output = open("bin", "wb+")
+    global memory
+    memory = bytearray()
     for line in lines:
         translateLine(line, output)
+    output.write(memory)
