@@ -32,6 +32,7 @@ def disassembler(memory):
         params = getParams(nextLine)
         if nextLine[0] == 1:
             current_line += params[0]
+            current_line -= 1
         str_to_write = func
         for i in range(commands[func][1]):
             str_to_write += " " + str(params[i])
